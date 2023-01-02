@@ -58,7 +58,7 @@ NASDAQ_100_TABLE_SYMBOL_HEADER = sconfig.get("NASDAQ_100_TABLE_SYMBOL_HEADER")
 # Stage 2
 CLOSE_HEADER = yconfig.get("CLOSE_HEADER")
 BEG_DT = (
-    (now - relativedelta(years=args.window))
+    (now - relativedelta(months=args.window))
     .replace(day=1)
     .strftime("%Y-%m-%d")
 )
