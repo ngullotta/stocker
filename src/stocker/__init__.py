@@ -1,4 +1,4 @@
 import logging
 
-FORMAT = ''
+FORMAT = ""
 logging.basicConfig(format=FORMAT)

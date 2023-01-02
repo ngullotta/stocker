@@ -100,6 +100,7 @@ df = df.dropna(axis=1)
 if "Date" in df:
     df["Date"] = to_datetime(df["Date"])
     df = df.set_index("Date")
+df.index = to_datetime(df.index)
 
 # Calculate percent change and resample this to monthly percent change
 # Skips the first row (will be NaN's)
