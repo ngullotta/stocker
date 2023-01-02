@@ -10,7 +10,11 @@ from yfinance import Ticker, download
 
 from stocker.cache import CacheController
 
-parser = ArgumentParser()
+# `exit_on_error` and `parser.error` rewrite are for tests only. The
+# argparser will choke if pytest params are passed in at runtime. Since
+# we don't care, we will ignore them
+parser = ArgumentParser(exit_on_error=False)
+parser.error = lambda foo: None
 config = ConfigParser()
 parser.add_argument(
     "-w",
