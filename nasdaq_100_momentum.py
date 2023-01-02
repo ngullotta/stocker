@@ -6,7 +6,7 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from numpy import prod
 from pandas import DataFrame, read_csv, read_html, to_datetime
-from yfinance import download
+from yfinance import Ticker, download
 
 from stocker.cache import CacheController
 
@@ -120,3 +120,6 @@ for months, number in [(12, 50), (6, 30), (3, 10)]:
 # The big reveal!
 for symbol in indices:
     logging.info("[*] %s", symbol)
+    ticker = Ticker(symbol)
+    logging.info("[^] <%s>", ticker.recommendations[-1:]["To Grade"].values[0])
+    print()
