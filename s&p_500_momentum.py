@@ -2,6 +2,7 @@ import logging
 from argparse import ArgumentParser
 from configparser import ConfigParser
 from datetime import datetime
+from sys import argv
 
 from dateutil.relativedelta import relativedelta
 from numpy import prod
@@ -9,6 +10,10 @@ from pandas import DataFrame, read_csv, read_html, to_datetime
 from yfinance import Ticker, download
 
 from stocker.cache import CacheController
+
+# Don't run the whole script when refreshing tests
+if "--cache-clear" in argv:
+    exit(0)
 
 # `exit_on_error` and `parser.error` rewrite are for tests only. The
 # argparser will choke if pytest params are passed in at runtime. Since
