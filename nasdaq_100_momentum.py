@@ -72,6 +72,10 @@ BEG_DT = (
     .strftime("%Y-%m-%d")
 )
 
+logging.info(
+    "[*] Beginning analysis on range %s - %s", BEG_DT, now.strftime("%Y-%m-%d")
+)
+
 # Cache ctl
 ON_MISS = {"func": download, "args": [], "kwargs": {"start": BEG_DT}}
 ON_HIT = {"func": read_csv, "args": [], "kwargs": {}}
@@ -86,6 +90,8 @@ cc = CacheController(
     },
 )
 
+logging.info("[*] Stage 1 - Fetching Top 100 tickers ...")
+
 # ---------------- Stage 1 ----------------
 # Get the symbols in the NASDAQ top 100 with offset
 df = read_html(NASDAQ_100_LINK)[NASDAQ_100_TABLE_OFFSET]
@@ -97,6 +103,9 @@ ON_MISS["kwargs"].update({"tickers": tickers})
 # Generate a new key for this, anytime tickers or BEG_DT changes
 # Key is just all the symbols concatenated + BEG_DT
 key = "".join(tickers) + BEG_DT
+
+logging.info("[*] Stage 2 - Fetching data for tickers ...")
+
 
 # ---------------- Stage 2 ----------------
 # Fetch data. This either hits or fills cache for next run
@@ -115,11 +124,15 @@ df.index = to_datetime(df.index)
 # Skips the first row (will be NaN's)
 mtl = (df.pct_change() + 1)[1:].resample("M").prod()
 
+logging.info("[*] Stage 3 - calculating percent deltas ...")
 # ---------------- Stage 3 ----------------
 # Grab rolling window of 12 month, 6 month, and 3 month percent changes
 # and use each to screen the next X entries
 indices = None
 for months, number in [(12, 50), (6, 30), (3, 10)]:
+    logging.info(
+        "[*] Rolling window (%d months/top %d performers)", months, number
+    )
     df = mtl.rolling(months).apply(prod)
     if indices is not None:
         top = df.loc[df.index[-1], indices].nlargest(number)
@@ -127,9 +140,11 @@ for months, number in [(12, 50), (6, 30), (3, 10)]:
         top = df.loc[df.index[-1]].nlargest(number)
     indices = top.index
 
+logging.info("[*] ---------- Generating Candidates ----------")
+
 # The big reveal!
-for symbol in indices:
-    logging.info("[*] %s", symbol)
-    ticker = Ticker(symbol)
-    logging.info("[^] <%s>", ticker.recommendations[-1:]["To Grade"].values[0])
-    print()
+for t in [Ticker(symbol) for symbol in indices]:
+    logging.info("[*] %s", t.ticker)
+    logging.info(
+        "[^] Reccomendation: %s", t.recommendations[-1:]["To Grade"].values[0]
+    )
