@@ -13,7 +13,8 @@ from stocker.cache import CacheController
 
 # Don't run the whole script when refreshing tests
 if "--cache-clear" in argv:
-    exit(0)
+    pass
+    # exit(0)
 
 # `exit_on_error` and `parser.error` rewrite are for tests only. The
 # argparser will choke if pytest params are passed in at runtime. Since
