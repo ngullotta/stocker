@@ -15,6 +15,9 @@ $ poetry install --no-dev
 
 ## Usage
 
+Just run one of the strategy scripts provided in the root dir. Check out their
+--help for optional parameters
+
 ```shell
 $ poetry run python3 nasdaq_100_momentum.py
 ```
