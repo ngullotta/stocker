@@ -5,9 +5,9 @@ from datetime import datetime
 from sys import argv
 
 from dateutil.relativedelta import relativedelta
-from numpy import prod
 from pandas import DataFrame, read_csv, read_html, to_datetime
-from yfinance import Ticker, download
+from pandas.tseries.offsets import BDay
+from yfinance import download
 
 from stocker.cache import CacheController
 
@@ -30,6 +30,13 @@ parser.add_argument(
     help="Historical time period in months to go back for financial data",
 )
 parser.add_argument(
+    "-p",
+    "--period",
+    type=int,
+    default=10,
+    help="RSI Period in days (don't count non-trading days e.g 2 weeks = 10)",
+)
+parser.add_argument(
     "-c",
     "--config",
     type=config.read,
@@ -46,7 +53,7 @@ parser.add_argument(
 args = parser.parse_args()
 
 # Sanity checks
-for section in ["s&p-500-momentum", "yfinance"]:
+for section in ["s&p-500-rsi", "yfinance"]:
     failed = False
     if section not in config.sections():
         failed = True
@@ -57,7 +64,7 @@ for section in ["s&p-500-momentum", "yfinance"]:
 
 # ---------------- Constants ----------------
 now = datetime.now()
-sconfig = config["s&p-500-momentum"]
+sconfig = config["s&p-500-rsi"]
 yconfig = config["yfinance"]
 
 # Stage 1
@@ -72,6 +79,9 @@ BEG_DT = (
     .replace(day=1)
     .strftime("%Y-%m-%d")
 )
+
+# We need Moving Average of >= 200 days
+assert (now - (now - relativedelta(months=args.window))).days >= 200
 
 logging.info(
     "[*] Beginning analysis on range %s - %s", BEG_DT, now.strftime("%Y-%m-%d")
@@ -124,31 +134,42 @@ if "Date" in df:
     df = df.set_index("Date")
 df.index = to_datetime(df.index)
 
-# Calculate percent change and resample this to monthly percent change
-# Skips the first row (will be NaN's)
-mtl = (df.pct_change() + 1)[1:].resample("M").prod()
+logging.info("[*] Stage 3 - Performing RSI calculations ...")
 
-logging.info("[*] Stage 3 - calculating percent deltas ...")
+last_trading_day = datetime.now() - BDay(1)
+
 # ---------------- Stage 3 ----------------
-# Grab rolling window of 12 month, 6 month, and 3 month percent changes
-# and use each to screen the next X entries
-indices = None
-for months, number in [(12, 100), (6, 50), (3, 10)]:
-    logging.info(
-        "[*] Rolling window (%d months/top %d performers)", months, number
-    )
-    df = mtl.rolling(months).apply(prod)
-    if indices is not None:
-        top = df.loc[df.index[-1], indices].nlargest(number)
-    else:
-        top = df.loc[df.index[-1]].nlargest(number)
-    indices = top.index
+buys, sells = [], []
+for ticker in df:
+    ndf = df[[ticker]].copy()
+    ndf["MA200"] = ndf[ticker].rolling(window=200).mean()
+    ndf["Delta"] = ndf[ticker].pct_change()
+    ndf["Upmove"] = ndf["Delta"].apply(lambda x: x if x > 0 else 0)
+    ndf["Downmove"] = ndf["Delta"].apply(lambda x: abs(x) if x < 0 else 0)
+    ndf["μUp"] = ndf["Upmove"].ewm(alpha=1/args.period).mean()
+    ndf["μDown"] = ndf["Downmove"].ewm(alpha=1/args.period).mean()
+    ndf.dropna(inplace=True)
+    ndf["RS"] = ndf["μUp"] / ndf["μDown"]
+    ndf["RSI"] = ndf["RS"].apply(lambda x: 100 - (100 / (x + 1)))
+    ndf.loc[(ndf[ticker] > ndf["MA200"]) & (ndf["RSI"] < 30), "Buy"] = "Yes"
+    ndf.loc[(ndf[ticker] < ndf["MA200"]) | (ndf["RSI"] > 30), "Buy"] = "No"
 
-logging.info("[*] ---------- Generating Candidates ----------")
+    yesdf = ndf.loc[ndf["Buy"] == "Yes"]
+    for i in range(len(yesdf)):
+        obj = yesdf.iloc[i]
+        if last_trading_day < obj.name < datetime.now():
+            buys.append(obj)
 
-# The big reveal!
-for t in [Ticker(symbol) for symbol in indices]:
-    logging.info("[*] %s", t.ticker)
-    logging.info(
-        "[^] Reccomendation: %s", t.recommendations[-1:]["To Grade"].values[0]
-    )
+logging.info(
+    "[*] ---------- Generating Candidates from last trading day %s ----------",
+    last_trading_day.strftime("%Y-%m-%d")
+)
+
+if len(buys) == 0:
+    logging.info("[*] Woops, no candidates could be found")
+
+for series in buys + sells:
+    symbol = series.index[0]
+    rsi = series["RSI"]
+    buy = series["Buy"]
+    logging.info(f"[*] {symbol:5}: RSI={rsi:.3f} Buy={buy}")
