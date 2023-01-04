@@ -35,6 +35,19 @@ alterations are made to suit my personal needs.
     months
   - Try to eliminate survivorship bias
 
-- `s&p_500_momentom`
+- `s&p_500_momentum`
   - Same thing as the NASDAQ script but with S&P 500
   - Window moves from 100/50/10
+
+- `s&p_500_rsi`
+  - Generates RSI indicators for the S&P 500 based on MA of 200 days and an RSI
+    period of 2 weeks (10 trading days)
+  - Generates candidates that have an RSI < 30 in the last trading day
+
+## ToDo:
+
+- Trading calendar support
+- Improve caching
+- Implement database support
+- Move repeated functionality into core stocker library
+- Add crypto analyzer
